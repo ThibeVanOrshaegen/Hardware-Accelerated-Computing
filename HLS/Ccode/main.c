@@ -7,102 +7,80 @@
 #include <stdlib.h>
 #include <time.h>
 
-clock_t start, stop;
-double cpu_time;
+clock_t tStart, tEnd;
+double elapsedTime;
 
-void printPixelValues(unsigned char* image, int width, int height, int channels) {
-    // Print pixel values for the first few pixels in the image
+void displayInputPixels(unsigned char* img, int imgWidth, int imgHeight, int colorChannels) {
     printf("Input Image Pixel Values:\n");
-    for (int i = 0; i < 5; i++) {
-        for (int j = 0; j < channels; j++) {
-            printf("%d ", image[i * width * channels + j]);
+    for (int x = 0; x < 5; x++) {
+        for (int y = 0; y < colorChannels; y++) {
+            printf("%d ", img[x * imgWidth * colorChannels + y]);
         }
         printf("\n");
     }
 }
 
-void printOutputPixelValues(unsigned char* outputImg, int width, int height, int channels) {
-    // Print pixel values for the first few pixels in the output image
+void displayOutputPixels(unsigned char* outImg, int imgWidth, int imgHeight, int colorChannels) {
     printf("Output Image Pixel Values:\n");
-    for (int i = 0; i < 5; i++) {
-        for (int j = 0; j < channels; j++) {
-            printf("%d ", outputImg[i * (width/2) * channels + j]);
+    for (int x = 0; x < 5; x++) {
+        for (int y = 0; y < colorChannels; y++) {
+            printf("%d ", outImg[x * (imgWidth/2) * colorChannels + y]);
         }
         printf("\n");
     }
 }
 
-void Max_Pooling(unsigned char* image, unsigned char* output, int width, int height, int channels) {
-    for(int i = 0; i < height; i += 2) {
-        for(int j = 0; j < width; j += 2) {
-            for(int c = 0; c < channels; c++) {
-                unsigned char max_val = 0;
-                // Iterate over the 2x2 pooling window
-                for(int m = 0; m < 2; m++) {
-                    for(int n = 0; n < 2; n++) {
-                        // Calculate the pixel position within the window
-                        int pixel_pos = ((i + m) * width + (j + n)) * channels + c;
-                        // Get the pixel value
-                        unsigned char pixel_val = image[pixel_pos];
-                        // Update max_val if the current pixel value is greater
-                        if(pixel_val > max_val) {
-                            max_val = pixel_val;
+void maxPooling(unsigned char* img, unsigned char* outImg, int imgWidth, int imgHeight, int colorChannels) {
+    for (int row = 0; row < imgHeight; row += 2) {
+        for (int col = 0; col < imgWidth; col += 2) {
+            for (int ch = 0; ch < colorChannels; ch++) {
+                unsigned char maxVal = 0;
+                for (int m = 0; m < 2; m++) {
+                    for (int n = 0; n < 2; n++) {
+                        int pixelIdx = ((row + m) * imgWidth + (col + n)) * colorChannels + ch;
+                        unsigned char pixelVal = img[pixelIdx];
+                        if (pixelVal > maxVal) {
+                            maxVal = pixelVal;
                         }
                     }
                 }
-                // Assign the maximum value to the output pixel
-                output[(i/2) * (width/2) * channels + (j/2) * channels + c] = max_val;
+                outImg[(row/2) * (imgWidth/2) * colorChannels + (col/2) * colorChannels + ch] = maxVal;
             }
         }
     }
 }
 
-void Min_Pooling(unsigned char* image, unsigned char* output, int width, int height, int channels) {
-    for(int i = 1; i < height; i+=2)
-    {
-        for(int j = 1; j < width; j+=2)
-        {
-            for (int c = 0; c < channels; c++)
-            {
-                unsigned char min_val = 0;
-                //initializes min_val with the pixel value at the top-left corner of the current 2x2 window.
-                min_val = image[(i-1) * width * channels + (j-1) * channels + c];
-
-                if (image[(i-1) * width * channels + j * channels + c] < min_val)
-                {
-                    min_val = image[(i-1) * width * channels + j * channels + c];
+void minPooling(unsigned char* img, unsigned char* outImg, int imgWidth, int imgHeight, int colorChannels) {
+    for (int row = 1; row < imgHeight; row += 2) {
+        for (int col = 1; col < imgWidth; col += 2) {
+            for (int ch = 0; ch < colorChannels; ch++) {
+                unsigned char minVal = img[(row-1) * imgWidth * colorChannels + (col-1) * colorChannels + ch];
+                if (img[(row-1) * imgWidth * colorChannels + col * colorChannels + ch] < minVal) {
+                    minVal = img[(row-1) * imgWidth * colorChannels + col * colorChannels + ch];
                 }
-                if (image[i * width * channels + (j-1) * channels + c] < min_val)
-                {
-                    min_val = image[i * width * channels + (j-1) * channels + c];
+                if (img[row * imgWidth * colorChannels + (col-1) * colorChannels + ch] < minVal) {
+                    minVal = img[row * imgWidth * colorChannels + (col-1) * colorChannels + ch];
                 }
-                if (image[i * width * channels + j * channels + c] < min_val)
-                {
-                    min_val = image[i * width * channels + j * channels + c];
+                if (img[row * imgWidth * colorChannels + col * colorChannels + ch] < minVal) {
+                    minVal = img[row * imgWidth * colorChannels + col * colorChannels + ch];
                 }
-
-                output[(i/2) * (width/2) * channels + (j/2) * channels + c] = min_val;
+                outImg[(row/2) * (imgWidth/2) * colorChannels + (col/2) * colorChannels + ch] = minVal;
             }
         }
     }
 }
 
-void Average_Pooling(unsigned char* image, unsigned char* output, int width, int height, int channels) {
-    for(int i = 1; i < height; i+=2)
-    {
-        for(int j = 1; j < width; j+=2)
-        {
-            for (int c = 0; c < channels; c++)
-            {
-                unsigned int sum = 0;
-                sum += image[(i-1) * width * channels + (j-1) * channels + c];
-                sum += image[(i-1) * width * channels + j * channels + c];
-                sum += image[i * width * channels + (j-1) * channels + c];
-                sum += image[i * width * channels + j * channels + c];
-
-                unsigned char average_val = sum / 4;
-
-                output[(i/2) * (width/2) * channels + (j/2) * channels + c] = average_val;
+void avgPooling(unsigned char* img, unsigned char* outImg, int imgWidth, int imgHeight, int colorChannels) {
+    for (int row = 1; row < imgHeight; row += 2) {
+        for (int col = 1; col < imgWidth; col += 2) {
+            for (int ch = 0; ch < colorChannels; ch++) {
+                unsigned int totalSum = 0;
+                totalSum += img[(row-1) * imgWidth * colorChannels + (col-1) * colorChannels + ch];
+                totalSum += img[(row-1) * imgWidth * colorChannels + col * colorChannels + ch];
+                totalSum += img[row * imgWidth * colorChannels + (col-1) * colorChannels + ch];
+                totalSum += img[row * imgWidth * colorChannels + col * colorChannels + ch];
+                unsigned char avgVal = totalSum / 4;
+                outImg[(row/2) * (imgWidth/2) * colorChannels + (col/2) * colorChannels + ch] = avgVal;
             }
         }
     }
@@ -110,36 +88,37 @@ void Average_Pooling(unsigned char* image, unsigned char* output, int width, int
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Arguments %s <image_path>\n", argv[0]);
+        printf("Usage: %s <image_path>\n", argv[0]);
         return 1;
     }
 
-    int width, height, channels;
-    unsigned char* img = stbi_load(argv[1], &width, &height, &channels, 0);
-    if (img == NULL) {
-        printf("Error in loading the image\n");
+    int imgWidth, imgHeight, colorChannels;
+    unsigned char* image = stbi_load(argv[1], &imgWidth, &imgHeight, &colorChannels, 0);
+    if (image == NULL) {
+        printf("Failed to load image\n");
         exit(1);
     }
-    printPixelValues(img, width, height, channels);
+    displayInputPixels(image, imgWidth, imgHeight, colorChannels);
 
-    unsigned char* outputImg = (unsigned char*)malloc((width/2 )* (height/2) * channels);
+    unsigned char* outImage = (unsigned char*)malloc((imgWidth/2) * (imgHeight/2) * colorChannels);
 
-    start =clock();
+    tStart = clock();
 
-    Max_Pooling(img, outputImg, width, height, channels);
+    maxPooling(image, outImage, imgWidth, imgHeight, colorChannels);
 
-    printOutputPixelValues(outputImg, width, height, channels);
+    displayOutputPixels(outImage, imgWidth, imgHeight, colorChannels);
 
-    stop =clock();
-    cpu_time = ((double)(stop - start)) / CLOCKS_PER_SEC;
-    printf("Time: %f\n", cpu_time);
+    tEnd = clock();
+    elapsedTime = ((double)(tEnd - tStart)) / CLOCKS_PER_SEC;
+    printf("Elapsed Time: %f seconds\n", elapsedTime);
 
-    char OutputPath[100];
-    snprintf(OutputPath, sizeof(OutputPath), "%s-nieuw.png", argv[1]);
-    stbi_write_png(OutputPath, (width/2), (height/2), channels, outputImg, (width/2) * channels);
+    char outputPath[100];
+    snprintf(outputPath, sizeof(outputPath), "%s-processed.png", argv[1]);
+    stbi_write_png(outputPath, (imgWidth/2), (imgHeight/2), colorChannels, outImage, (imgWidth/2) * colorChannels);
 
-    stbi_image_free(img);
-    free(outputImg);
+    stbi_image_free(image);
+    free(outImage);
 
     return 0;
 }
+
