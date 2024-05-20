@@ -7,51 +7,51 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../Include/stb_image_write.h"
 
-clock_t start, stop;
-double cpu_time;
+clock_t beginTime, endTime;
+double elapsedTime;
 
-float kernel[3][3] = {
+float convKernel[3][3] = {
     {1, 0, -1},
     {1, 0, -1},
     {1, 0, -1}
 };
 
-void applyConvolution2D(const unsigned char* image, unsigned char* output, int width, int height, int channels, const float* kernel, int kernelWidth, int kernelHeight) {
-    int edgeX = kernelWidth / 2;
-    int edgeY = kernelHeight / 2;
+void performConvolution(const unsigned char* inputImg, unsigned char* resultImg, int imgWidth, int imgHeight, int imgChannels, const float* kernelMatrix, int kernelW, int kernelH) {
+    int halfKernelW = kernelW / 2;
+    int halfKernelH = kernelH / 2;
 
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            for (int ch = 0; ch < channels; ch++) {
-                float sum = 0.0;
+    for (int row = 0; row < imgHeight; row++) {
+        for (int col = 0; col < imgWidth; col++) {
+            for (int channel = 0; channel < imgChannels; channel++) {
+                float accumulator = 0.0;
 
-                for (int ky = -edgeY; ky <= edgeY; ky++) {
-                    for (int kx = -edgeX; kx <= edgeX; kx++) {
-                        int ix = x + kx;
-                        int iy = y + ky;
+                for (int ky = -halfKernelH; ky <= halfKernelH; ky++) {
+                    for (int kx = -halfKernelW; kx <= halfKernelW; kx++) {
+                        int pixelX = col + kx;
+                        int pixelY = row + ky;
 
-                        if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
-                            sum += kernel[(ky + edgeY) * kernelWidth + (kx + edgeX)] * image[(iy * width + ix) * channels + ch];
+                        if (pixelX >= 0 && pixelX < imgWidth && pixelY >= 0 && pixelY < imgHeight) {
+                            accumulator += kernelMatrix[(ky + halfKernelH) * kernelW + (kx + halfKernelW)] * inputImg[(pixelY * imgWidth + pixelX) * imgChannels + channel];
                         }
                     }
                 }
-                int val = (int)sum;
-                output[(y * width + x) * channels + ch] = (unsigned char)(val > 255 ? 255 : (val < 0 ? 0 : val));
+                int pixelValue = (int)accumulator;
+                resultImg[(row * imgWidth + col) * imgChannels + channel] = (unsigned char)(pixelValue > 255 ? 255 : (pixelValue < 0 ? 0 : pixelValue));
             }
         }
     }
 }
 
-void grayscale(const unsigned char* input, unsigned char* output, int width, int height, int channels) {
-    for (int y = 0; y < height; y++) {
-        for (int x = 0; x < width; x++) {
-            int gray = 0;
-            for (int c = 0; c < channels; c++) {
-                gray += input[(y * width + x) * channels + c];
+void convertToGrayscale(const unsigned char* sourceImg, unsigned char* grayImg, int imgWidth, int imgHeight, int imgChannels) {
+    for (int y = 0; y < imgHeight; y++) {
+        for (int x = 0; x < imgWidth; x++) {
+            int grayValue = 0;
+            for (int ch = 0; ch < imgChannels; ch++) {
+                grayValue += sourceImg[(y * imgWidth + x) * imgChannels + ch];
             }
-            gray /= channels;
-            for (int c = 0; c < channels; c++) {
-                output[(y * width + x) * channels + c] = (unsigned char)gray;
+            grayValue /= imgChannels;
+            for (int ch = 0; ch < imgChannels; ch++) {
+                grayImg[(y * imgWidth + x) * imgChannels + ch] = (unsigned char)grayValue;
             }
         }
     }
@@ -59,39 +59,37 @@ void grayscale(const unsigned char* input, unsigned char* output, int width, int
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        printf("Path: %s <image_path> [noOut]\n", argv[0]);
+        printf("Usage: %s <image_path> [noOutput]\n", argv[0]);
         return 1;
     }
 
-    int width, height, channels;
-    unsigned char* img = stbi_load(argv[1], &width, &height, &channels, 0); 
-    if (img == NULL) {
-        printf("Error in loading the image\n");
+    int imgWidth, imgHeight, imgChannels;
+    unsigned char* inputImage = stbi_load(argv[1], &imgWidth, &imgHeight, &imgChannels, 0);
+    if (inputImage == NULL) {
+        printf("Failed to load image\n");
         exit(1);
     }
 
-    unsigned char* grayscaleImg = (unsigned char*)malloc(width * height * channels);
-    grayscale(img, grayscaleImg, width, height, channels);
+    unsigned char* grayImage = (unsigned char*)malloc(imgWidth * imgHeight * imgChannels);
+    convertToGrayscale(inputImage, grayImage, imgWidth, imgHeight, imgChannels);
 
-    unsigned char* outputImg = (unsigned char*)malloc(width * height * channels);
+    unsigned char* convolutedImage = (unsigned char*)malloc(imgWidth * imgHeight * imgChannels);
 
-    start = clock();
+    beginTime = clock();
 
-    applyConvolution2D(grayscaleImg, outputImg, width, height, channels, (float*)kernel, 3, 3);
+    performConvolution(grayImage, convolutedImage, imgWidth, imgHeight, imgChannels, (float*)convKernel, 3, 3);
 
-    stop = clock();
-    cpu_time = ((double)(stop - start)) / CLOCKS_PER_SEC;
-    printf("Time taken: %f\n", cpu_time);
+    endTime = clock();
+    elapsedTime = ((double)(endTime - beginTime)) / CLOCKS_PER_SEC;
+    printf("Processing time: %f seconds\n", elapsedTime);
 
-    if (argc >= 3 && strcmp(argv[2], "noOut") != 0) {
-        char OutputPath[100];
-        snprintf(OutputPath, sizeof(OutputPath), "%s-output.png", argv[1]);
-        stbi_write_png(OutputPath, width, height, channels, outputImg, width * channels);
-    }
+    char outputFilePath[100];
+    snprintf(outputFilePath, sizeof(outputFilePath), "%s_convoluted.png", argv[1]);
+    stbi_write_png(outputFilePath, imgWidth, imgHeight, imgChannels, convolutedImage, imgWidth * imgChannels);
 
-    stbi_image_free(img);
-    free(grayscaleImg);
-    free(outputImg);
+    stbi_image_free(inputImage);
+    free(grayImage);
+    free(convolutedImage);
 
     return 0;
 }
