@@ -29,21 +29,14 @@ __global__ void applyConvolution(unsigned char* image, unsigned char* output, in
                 int iy = y + ky;
                 if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
                     for (int ch = 0; ch < channels; ch++) {
-                        if (ch < 3) { // Apply convolution only to RGB channels
-                            sum[ch] += kernel[(ky + edge) * 3 + (kx + edge)] * image[(iy * width + ix) * channels + ch];
-                        }
+                        sum[ch] += kernel[(ky + edge) * 3 + (kx + edge)] * image[(iy * width + ix) * channels + ch];
                     }
                 }
             }
         }
         for (int ch = 0; ch < channels; ch++) {
-            if (ch < 3) {
-                int val = (int)sum[ch];
-                output[(y * width + x) * channels + ch] = (unsigned char)(val > 255 ? 255 : (val < 0 ? 0 : val));
-            } else {
-                // Preserve the alpha channel if present
-                output[(y * width + x) * channels + ch] = 255;
-            }
+            int val = (int)sum[ch];
+            output[(y * width + x) * channels + ch] = (unsigned char)(val > 255 ? 255 : (val < 0 ? 0 : val));
         }
 
         threadid += blockDim.x * gridDim.x;
@@ -68,16 +61,10 @@ int main(int argc, char* argv[]) {
             continue;
         }
 
-        unsigned char* grayImg = (unsigned char*)malloc(width * height * channels);
-
-        for (int j = 0; j < width * height; j++) {
-            grayImg[j] = (unsigned char)(0.2989 * img[3 * j] + 0.5870 * img[3 * j + 1] + 0.1140 * img[3 * j + 2]);
-        }
-
-        float kernel[3] = {
-            1, 0, -1,
-            1, 0, -1,
-            1, 0, -1
+        float kernel[3][3] = {
+            {1, 0, -1},
+            {1, 0, -1},
+            {1, 0, -1}
         };
 
         unsigned char* outputImg = (unsigned char*)malloc(width * height * channels);
@@ -86,7 +73,7 @@ int main(int argc, char* argv[]) {
 
         unsigned char* d_img;
         cudaMalloc(&d_img, width * height * channels);
-        cudaMemcpy(d_img, grayImg, width * height * channels, cudaMemcpyHostToDevice);
+        cudaMemcpy(d_img, img, width * height * channels, cudaMemcpyHostToDevice);
 
         unsigned char* d_outputImg;
         cudaMalloc(&d_outputImg, width * height * channels);
@@ -113,7 +100,6 @@ int main(int argc, char* argv[]) {
 
         stbi_image_free(img);
         free(outputImg);
-        free(grayImg);
 
         cudaFree(d_img);
         cudaFree(d_outputImg);
@@ -122,3 +108,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
