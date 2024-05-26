@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
             grayImg[j] = (unsigned char)(0.2989 * img[3 * j] + 0.5870 * img[3 * j + 1] + 0.1140 * img[3 * j + 2]);
         }
 
-        float kernel[9] = {
+        float kernel[3] = {
             1, 0, -1,
             1, 0, -1,
             1, 0, -1
