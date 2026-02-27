@@ -1,4 +1,4 @@
-# HacGoed
+# Hardware-Accelerated-Computing
 
 ## C Code
 
